@@ -1,5 +1,5 @@
 # na czas budowania obrazu - źródło plików:
-FROM debian:bullseye-slim as FilesSource
+FROM ubuntu:20.04 as FilesSource
 
 ARG MISP_TAG=2.4.167
 
@@ -34,7 +34,7 @@ RUN set -eux; \
   composer install --ignore-platform-reqs ; \
   composer require jumbojett/openid-connect-php --ignore-platform-reqs
 
-FROM debian:bullseye-slim as php-build
+FROM ubuntu:20.04 as php-build
 
 ENV DEBIAN_FRONTEND noninteractive
 
@@ -67,7 +67,7 @@ RUN set -eux; \
   make; \
   make install
 
-FROM debian:bullseye-slim as python-build
+FROM ubuntu:20.04 as python-build
 
 ENV DEBIAN_FRONTEND noninteractive
 
@@ -154,7 +154,7 @@ RUN set -eux; \
   find . -name "coverage*" | xargs rm -f; \
   find . -name "pytest*" | xargs rm -f
 
-FROM debian:bullseye-slim
+FROM ubuntu:20.04
 
 ENV DEBIAN_FRONTEND noninteractive
 
