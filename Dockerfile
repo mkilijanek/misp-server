@@ -253,25 +253,25 @@ RUN set -eux; \
   rm /etc/nginx/sites-enabled/*; \
   mkdir /run/php /etc/nginx/certs
 
-COPY --from=FilesSource /opt/docker-misp/server/files/nginx/sites-available/ /etc/nginx/sites-available/
-COPY --from=FilesSource /opt/docker-misp/server/files/nginx/conf.d/ /nginx-config-templates
-COPY --from=FilesSource /opt/docker-misp/server/files/nginx/site-customization.conf /etc/nginx/site-customization.conf
+COPY --from=FilesSource /opt/docker-misp/files/nginx/sites-available/ /etc/nginx/sites-available/
+COPY --from=FilesSource /opt/docker-misp/files/nginx/conf.d/ /nginx-config-templates
+COPY --from=FilesSource /opt/docker-misp/files/nginx/site-customization.conf /etc/nginx/site-customization.conf
 
 # php configuration templates
-COPY --from=FilesSource /opt/docker-misp/server/files/fpm-config-template.conf /fpm-config-template.conf
-COPY --from=FilesSource /opt/docker-misp/server/files/php-config-templates /php-config-templates
+COPY --from=FilesSource /opt/docker-misp/files/fpm-config-template.conf /fpm-config-template.conf
+COPY --from=FilesSource /opt/docker-misp/files/php-config-templates /php-config-templates
 
 # supervisor
-COPY --from=FilesSource /opt/docker-misp/server/files/supervisor/supervisord.conf /etc/supervisord.conf
+COPY --from=FilesSource /opt/docker-misp/files/supervisor/supervisord.conf /etc/supervisord.conf
 
 # entrypoints
-COPY --from=FilesSource /opt/docker-misp/server/files/docker-entrypoint.sh /usr/local/bin/docker-entrypoint.sh
-COPY --from=FilesSource /opt/docker-misp/server/files/entrypoint-workers.sh /usr/local/bin/entrypoint-workers.sh
+COPY --from=FilesSource /opt/docker-misp/files/docker-entrypoint.sh /usr/local/bin/docker-entrypoint.sh
+COPY --from=FilesSource /opt/docker-misp/files/entrypoint-workers.sh /usr/local/bin/entrypoint-workers.sh
 
 # probes
-COPY --from=FilesSource /opt/docker-misp/server/files/docker-readiness.sh /usr/local/bin/docker-readiness.sh
-COPY --from=FilesSource /opt/docker-misp/server/files/docker-liveness.sh /usr/local/bin/docker-liveness.sh
-COPY --from=FilesSource /opt/docker-misp/server/files/php-fpm-healthcheck /usr/local/bin/php-fpm-healthcheck
+COPY --from=FilesSource /opt/docker-misp/files/docker-readiness.sh /usr/local/bin/docker-readiness.sh
+COPY --from=FilesSource /opt/docker-misp/files/docker-liveness.sh /usr/local/bin/docker-liveness.sh
+COPY --from=FilesSource /opt/docker-misp/files/php-fpm-healthcheck /usr/local/bin/php-fpm-healthcheck
 
 # change work directory
 WORKDIR /var/www/MISP
