@@ -1,181 +1,284 @@
-FROM composer:2.1.14 as composer-build
-    ARG MISP_TAG
-    WORKDIR /tmp
-    ADD https://raw.githubusercontent.com/MISP/MISP/${MISP_TAG}/app/composer.json /tmp
-    RUN composer install --ignore-platform-reqs && \
-     composer require jakub-onderka/openid-connect-php:1.0.0-rc1 --ignore-platform-reqs
+# na czas budowania obrazu - źródło plików:
+FROM debian:bullseye-slim as FilesSource
+
+ARG MISP_VER=2.4.167
+ARG MISP_TAG=v2.4.167
+
+RUN apt update && apt install wget -y && mkdir -p /opt/docker-misp && cd /opt/ && wget https://github.com/mkilijanek/docker-misp/archive/refs/tags/${MISP_TAG}.tar.gz && tar xvf ${MISP_TAG}.tar.gz -C /opt && cp -r /opt/docker-misp-${MISP_VER}/* /opt/docker-misp/ 
+    
+    
+RUN apt-get remove --purge git wget -y && apt-get autoremove -y && apt-get clean -y && rm -rf /var/lib/apt/lists/*
+
+# budowanie obrazu:
+FROM composer:2.2 as composer-build
+
+ARG MISP_TAG=v2.4.167
+
+RUN set -eux; \
+  mkdir -p /var/www/MISP ; \
+  git clone --branch ${MISP_TAG} --depth 1 https://github.com/MISP/MISP.git /var/www/MISP; \
+  cd /var/www/MISP; \
+  git submodule update --init --recursive; \
+  mkdir -p /deps; \
+  mv PyMISP /deps; \
+  cd /var/www/MISP/app/files/scripts; \
+  mv mixbox /deps; \
+  mv python-maec /deps; \
+  mv python-cybox /deps; \
+  mv python-stix /deps; \
+  mv cti-python-stix2 /deps
+
+WORKDIR /var/www/MISP/app
+
+RUN set -eux; \
+  composer config --no-plugins allow-plugins.composer/installers true; \
+  composer install --ignore-platform-reqs ; \
+  composer require jumbojett/openid-connect-php --ignore-platform-reqs
 
 FROM debian:bullseye-slim as php-build
-    RUN apt-get update; apt-get install -y --no-install-recommends \
-        gcc \
-        make \
-        libfuzzy-dev \
-        ca-certificates \
-        php \
-        php-dev \
-        php-pear \
-        librdkafka-dev \
-        git \
-        && apt-get autoremove -y && apt-get clean -y && rm -rf /var/lib/apt/lists/*
-        
-        RUN pecl channel-update pecl.php.net
-        RUN cp "/usr/lib/$(gcc -dumpmachine)"/libfuzzy.* /usr/lib; pecl install ssdeep && pecl install rdkafka
-        RUN git clone --recursive --depth=1 https://github.com/kjdev/php-ext-brotli.git && cd php-ext-brotli && phpize && ./configure && make && make install
-        
+
+ENV DEBIAN_FRONTEND noninteractive
+
+RUN set -eux; \
+  apt-get update; \
+  apt-get upgrade -y; \
+  apt-get install -y --no-install-recommends \
+    gcc \
+    make \
+    libfuzzy-dev \
+    ca-certificates \
+    php \
+    php-dev \
+    php-pear \
+    librdkafka-dev \
+    git; \
+  apt-get autoremove -y; \
+  apt-get clean -y; \
+  rm -rf /var/lib/apt/lists/*
+
+RUN set -eux; \
+  pecl channel-update pecl.php.net; \
+  cp /usr/lib/x86_64-linux-gnu/libfuzzy.* /usr/lib; \
+  pecl install ssdeep; \
+  pecl install rdkafka; \
+  git clone --recursive --depth=1 https://github.com/kjdev/php-ext-brotli.git; \
+  cd php-ext-brotli; \
+  phpize; \
+  ./configure; \
+  make; \
+  make install
 
 FROM debian:bullseye-slim as python-build
-    RUN apt-get update; apt-get install -y --no-install-recommends \
-        gcc \
-        git \
-        python3 \
-        python3-dev \
-        python3-pip \
-        python3-setuptools \
-        python3-wheel \
-        libfuzzy-dev \
-        libffi-dev \
-        ca-certificates \
-        && apt-get autoremove -y && apt-get clean -y && rm -rf /var/lib/apt/lists/*
 
-    RUN mkdir /wheels
+ENV DEBIAN_FRONTEND noninteractive
 
-    WORKDIR /tmp
+RUN set -eux; \
+  apt-get update; \
+  apt-get upgrade -y; \
+  apt-get install -y --no-install-recommends \
+    gcc \
+    git \
+    python3.9 \
+    python3.9-dev \
+    python3-pip \
+    python3-setuptools \
+    python3-wheel \
+    libfuzzy-dev \
+    libffi-dev \
+    ca-certificates; \
+  apt-get autoremove -y; \
+  apt-get clean -y; \
+  rm -rf /var/lib/apt/lists/*
 
-    RUN git clone --depth 1 https://github.com/CybOXProject/mixbox.git; \
-        cd mixbox || exit; python3 setup.py bdist_wheel -d /wheels; \
-        sed -i 's/-e //g' requirements.txt; pip3 wheel -r requirements.txt --no-cache-dir -w /wheels/
+RUN mkdir /wheels
 
-    # install python-maec
-    RUN git clone --depth 1 https://github.com/MAECProject/python-maec.git; \
-        cd python-maec || exit; python3 setup.py bdist_wheel -d /wheels
+WORKDIR /tmp
 
-    # install python-cybox
-    RUN git clone --depth 1 https://github.com/CybOXProject/python-cybox.git; \
-        cd python-cybox || exit; python3 setup.py bdist_wheel -d /wheels; \
-        sed -i 's/-e //g' requirements.txt; pip3 wheel -r requirements.txt --no-cache-dir -w /wheels/
+# install mixbox
+COPY --from=composer-build /deps/mixbox/ /tmp/mixbox/
+RUN set -eux; \
+  cd mixbox; \
+  ls; \
+  python3 setup.py bdist_wheel -d /wheels; \
+  sed -i 's/-e //g' requirements.txt; \
+  pip3 wheel -r requirements.txt --no-cache-dir -w /wheels/
 
-    # install python stix
-    RUN git clone --depth 1 https://github.com/STIXProject/python-stix.git; \
-        cd python-stix || exit; python3 setup.py bdist_wheel -d /wheels; \
-        sed -i 's/-e //g' requirements.txt; pip3 wheel -r requirements.txt --no-cache-dir -w /wheels/
+# install python-maec
+COPY --from=composer-build /deps/python-maec/ /tmp/python-maec/
+RUN set -eux; \
+  cd python-maec; \
+  python3 setup.py bdist_wheel -d /wheels
 
-    # install STIX2.0 library to support STIX 2.0 export:
-    # Original Requirements has a bunch of non-required pacakges, force it to only grab wheels for deps from setup.py
-    RUN git clone --depth 1 https://github.com/MISP/cti-python-stix2.git; \
-        cd cti-python-stix2 || exit; python3 setup.py bdist_wheel -d /wheels; \
-        echo "-e ." > requirements.txt; pip3 wheel -r requirements.txt --no-cache-dir -w /wheels/
+# install python-cybox
+COPY --from=composer-build /deps/python-cybox/ /tmp/python-cybox/
+  RUN set -eux; \
+  cd python-cybox; \
+  python3 setup.py bdist_wheel -d /wheels; \
+  sed -i 's/-e //g' requirements.txt; \
+  pip3 wheel -r requirements.txt --no-cache-dir -w /wheels/
 
-    # install PyMISP
-    RUN git clone --depth 1 https://github.com/MISP/PyMISP.git; \
-        cd PyMISP || exit; python3 setup.py bdist_wheel -d /wheels
+# install python stix
+COPY --from=composer-build /deps/python-stix/ /tmp/python-stix/
+RUN set -eux; \
+  cd python-stix; \
+  python3 setup.py bdist_wheel -d /wheels; \
+  sed -i 's/-e //g' requirements.txt; \
+  pip3 wheel -r requirements.txt --no-cache-dir -w /wheels/
 
-    # install pydeep
-    RUN git clone --depth 1 https://github.com/coolacid/pydeep.git; \
-        cd pydeep || exit; python3 setup.py bdist_wheel -d /wheels
+# install STIX2.0 library to support STIX 2.0 export
+COPY --from=composer-build /deps/cti-python-stix2/ /tmp/cti-python-stix2/
+RUN set -eux; \
+  cd cti-python-stix2; \
+  python3 setup.py bdist_wheel -d /wheels; \
+  sed -i 's/-e //g' requirements.txt; \
+  pip3 wheel -r requirements.txt --no-cache-dir -w /wheels/
 
-    # Grab other modules we need
-    RUN pip3 wheel --no-cache-dir -w /wheels/ plyara pyzmq redis python-magic lief
+# install PyMISP
+COPY --from=composer-build /deps/PyMISP /tmp/PyMISP/
+RUN set -eux; \
+  cd PyMISP; \
+  python3 setup.py bdist_wheel -d /wheels
 
-    # Remove extra packages due to incompatible requirements.txt files
-    WORKDIR /wheels
-    RUN find . -name "Sphinx*" | tee /dev/stderr | grep -v "Sphinx-1.5.5" | xargs rm -f
+# grab other modules we need
+RUN set -eux; \
+  pip3 wheel --no-cache-dir -w /wheels/ plyara pyzmq redis python-magic lief cryptography pydeep
 
+# remove extra packages due to incompatible requirements.txt files
+WORKDIR /wheels
+
+RUN set -eux; \
+  find . -name "pluggy*" | grep -v "pluggy-0.13.1" | xargs rm -f; \
+  find . -name "tox*" | grep -v "tox-2.7.0" | xargs rm -f; \
+  find . -name "Sphinx*" | grep -v "Sphinx-1.8.6" | xargs rm -f; \
+  find . -name "docutils*" | grep -v "docutils-0.17.1" | xargs rm -f; \
+  find . -name "pyparsing*" | grep -v "pyparsing-3.0.6" | xargs rm -f; \
+  find . -name "coverage*" | xargs rm -f; \
+  find . -name "pytest*" | xargs rm -f
 
 FROM debian:bullseye-slim
-ENV DEBIAN_FRONTEND noninteractive
-ARG MISP_TAG
-ARG PHP_VER
 
-# OS Packages
-    RUN apt-get update; apt-get install -y --no-install-recommends \
-        # Requirements:
-        procps \
-        sudo \
-        nginx \
-        supervisor \
-        git \
-        cron \
-        openssl \
-        gpg-agent gpg \
-        ssdeep \
-        libfuzzy2 \
-        mariadb-client \
-        rsync \
-        # Python Requirements
-        python3 \
-        python3-setuptools \
-        python3-pip \
-        # PHP Requirements
-        php \
-        php-apcu \
-        php-curl \
-        php-xml \
-        php-intl \
-        php-bcmath \
-        php-mbstring \
-        php-mysql \
-        php-redis \
-        php-gd \
-        php-fpm \
-        php-zip \
-        librdkafka1 \
-        libbrotli1 \
-        # Unsure we need these
-        zip unzip \
-        && apt-get autoremove -y && apt-get clean -y && rm -rf /var/lib/apt/lists/*
+ENV DEBIAN_FRONTEND noninteractive
+
+ARG PHP_VER=20190902
+
+# Use MariaDB mirror repository (more up to date than Debian repositories!):
+RUN set -eux; \
+    apt-get update; \
+    apt-get install apt-transport-https curl -y; \
+    curl -o /etc/apt/trusted.gpg.d/mariadb_release_signing_key.asc 'https://mariadb.org/mariadb_release_signing_key.asc'; \
+    echo 'deb https://ftp.icm.edu.pl/pub/unix/database/mariadb/repo/10.5/debian bullseye main' >>/etc/apt/sources.list; \
+    apt-get update
+    
+# OS packages
+RUN set -eux; \
+  apt-get update; \
+  apt-get upgrade -y; \
+  apt-get install -y --no-install-recommends \
+    # requirements
+    libfcgi-bin \
+    gettext-base \
+    procps \
+    sudo \
+    nginx \
+    supervisor \
+    git \
+    cron \
+    openssl \
+    gpg-agent \
+    gpg \
+    ssdeep \
+    libfuzzy2 \
+    mariadb-client \
+    rsync \
+    # Python Requirements
+    python3.9 \
+    python3-setuptools \
+    python3-pip \
+    # PHP Requirements
+    php \
+    php-curl \
+    php-xml \
+    php-intl \
+    php-bcmath \
+    php-mbstring \
+    php-mysql \
+    php-redis \
+    php-gd \
+    php-fpm \
+    php-zip \
+    php-apcu \
+    php-opcache \
+    php-gnupg \
+    librdkafka1 \
+    libbrotli1 \
+    # Unsure we need these
+    zip \
+    unzip; \
+  apt-get autoremove -y; \
+  apt-get clean -y; \
+  rm -rf /var/lib/apt/lists/*
 
 # MISP code
-    # Download MISP using git in the /var/www/ directory.
-    RUN git clone --branch ${MISP_TAG} --depth 1 https://github.com/MISP/MISP.git /var/www/MISP; \
-        # We build the MISP modules outside, so we don't need to grab those submodules
-        cd /var/www/MISP/app || exit; git submodule update --init --recursive .;
+COPY --from=composer-build /var/www/MISP /var/www/MISP
 
-# Python Modules
-    COPY --from=python-build /wheels /wheels
-    RUN pip3 install --no-cache-dir /wheels/*.whl && rm -rf /wheels
+# python Modules
+COPY --from=python-build /wheels /wheels
+RUN set -eux ;\
+  pip3 install --no-cache-dir /wheels/*.whl; \
+  rm -rf /wheels
 
 # PHP
-    # Install ssdeep prebuild, latest composer, then install the app's PHP deps
-    COPY --from=php-build /usr/lib/php/${PHP_VER}/ssdeep.so /usr/lib/php/${PHP_VER}/ssdeep.so
-    COPY --from=php-build /usr/lib/php/${PHP_VER}/rdkafka.so /usr/lib/php/${PHP_VER}/rdkafka.so
-    COPY --from=php-build /usr/lib/php/${PHP_VER}/brotli.so /usr/lib/php/${PHP_VER}/brotli.so
 
-    COPY --from=composer-build /tmp/Vendor /var/www/MISP/app/Vendor
-    COPY --from=composer-build /tmp/Plugin /var/www/MISP/app/Plugin
-    
-    RUN for dir in /etc/php/*; do echo "extension=rdkafka.so" > "$dir/mods-available/rdkafka.ini"; done; phpenmod rdkafka
-    RUN for dir in /etc/php/*; do echo "extension=brotli.so" > "$dir/mods-available/brotli.ini"; done; phpenmod brotli
+# install ssdeep prebuild, latest composer, then install the app's PHP deps
+COPY --from=php-build /usr/lib/php/${PHP_VER}/ssdeep.so /usr/lib/php/${PHP_VER}/ssdeep.so
+COPY --from=php-build /usr/lib/php/${PHP_VER}/rdkafka.so /usr/lib/php/${PHP_VER}/rdkafka.so
+COPY --from=php-build /usr/lib/php/${PHP_VER}/brotli.so /usr/lib/php/${PHP_VER}/brotli.so
 
-    RUN for dir in /etc/php/*; do echo "extension=ssdeep.so" > "$dir/mods-available/ssdeep.ini"; done \
-            ;phpenmod redis \
-    # Enable CakeResque with php-gnupgp
-        ;phpenmod gnupg \
-    # Enable ssdeep we build earlier
-        ;phpenmod ssdeep \
-    # To use the scheduler worker for scheduled tasks, do the following:
-        ;cp -fa /var/www/MISP/INSTALL/setup/config.php /var/www/MISP/app/Plugin/CakeResque/Config/config.php
+RUN set -eux; \
+  for dir in /etc/php/*; do echo "extension=rdkafka.so" > "$dir/mods-available/rdkafka.ini"; done; \
+  for dir in /etc/php/*; do echo "extension=brotli.so" > "$dir/mods-available/brotli.ini"; done; \
+  for dir in /etc/php/*; do echo "extension=ssdeep.so" > "$dir/mods-available/ssdeep.ini"; done; \
+  phpenmod rdkafka; \
+  phpenmod brotli; \
+  phpenmod ssdeep; \
+  cp -fa /var/www/MISP/INSTALL/setup/config.php /var/www/MISP/app/Plugin/CakeResque/Config/config.php
+
+# change name of the file store, default configuration and tmp directory, so we can sync from it in the entrypoint
+RUN set -eux; \
+  mv /var/www/MISP/app/files /var/www/MISP/app/files.dist; \
+  mv /var/www/MISP/app/Config /var/www/MISP/app/Config.dist; \
+  mv /var/www/MISP/app/tmp /var/www/MISP/app/tmp.dist
 
 # nginx
-    RUN rm /etc/nginx/sites-enabled/*; mkdir /run/php /etc/nginx/certs
-    COPY files/etc/nginx/misp /etc/nginx/sites-available/misp
-    COPY files/etc/nginx/misp-secure /etc/nginx/sites-available/misp-secure
-    COPY files/etc/nginx/misp80 /etc/nginx/sites-available/misp80
-    COPY files/etc/nginx/misp80-noredir /etc/nginx/sites-available/misp80-noredir
+RUN set -eux; \
+  rm /etc/nginx/sites-enabled/*; \
+  mkdir /run/php /etc/nginx/certs
 
-# Make a copy of the file store, so we can sync from it
-    RUN cp -R /var/www/MISP/app/files /var/www/MISP/app/files.dist
+COPY --from=FilesSource /opt/docker-misp/server/files/nginx/sites-available/ /etc/nginx/sites-available/
+COPY --from=FilesSource /opt/docker-misp/server/files/nginx/conf.d/ /nginx-config-templates
+COPY --from=FilesSource /opt/docker-misp/server/files/nginx/site-customization.conf /etc/nginx/site-customization.conf
 
-# Make a copy of the configurations, so we can sync from it
-    RUN cp -R /var/www/MISP/app/Config /var/www/MISP/app/Config.dist
+# php configuration templates
+COPY --from=FilesSource /opt/docker-misp/server/files/fpm-config-template.conf /fpm-config-template.conf
+COPY --from=FilesSource /opt/docker-misp/server/files/php-config-templates /php-config-templates
 
-# Entrypoints
-    COPY files/etc/supervisor/supervisor.conf /etc/supervisor/conf.d/supervisord.conf
-    COPY files/entrypoint_fpm.sh /
-    COPY files/entrypoint_nginx.sh /
-    COPY files/entrypoint_cron.sh /
-    COPY files/entrypoint_workers.sh /
-    COPY files/entrypoint.sh /
-    ENTRYPOINT [ "/entrypoint.sh" ]
+# supervisor
+COPY --from=FilesSource /opt/docker-misp/server/files/supervisor/supervisord.conf /etc/supervisord.conf
 
-# Change Workdirectory
-    WORKDIR /var/www/MISP
+# entrypoints
+COPY --from=FilesSource /opt/docker-misp/server/files/docker-entrypoint.sh /usr/local/bin/docker-entrypoint.sh
+COPY --from=FilesSource /opt/docker-misp/server/files/entrypoint-workers.sh /usr/local/bin/entrypoint-workers.sh
+
+# probes
+COPY --from=FilesSource /opt/docker-misp/server/files/docker-readiness.sh /usr/local/bin/docker-readiness.sh
+COPY --from=FilesSource /opt/docker-misp/server/files/docker-liveness.sh /usr/local/bin/docker-liveness.sh
+COPY --from=FilesSource /opt/docker-misp/server/files/php-fpm-healthcheck /usr/local/bin/php-fpm-healthcheck
+
+# change work directory
+WORKDIR /var/www/MISP
+
+RUN set -eux; \
+    apt-get update; \
+    apt-get install apt-transport-https curl -y;
+    
+ENTRYPOINT ["docker-entrypoint.sh"]
