@@ -77,8 +77,8 @@ RUN set -eux; \
   apt-get install -y --no-install-recommends \
     gcc \
     git \
-    python3.9 \
-    python3.9-dev \
+    python3 \
+    python3-dev \
     python3-pip \
     python3-setuptools \
     python3-wheel \
@@ -190,7 +190,7 @@ RUN set -eux; \
     mariadb-client \
     rsync \
     # Python Requirements
-    python3.9 \
+    python3 \
     python3-setuptools \
     python3-pip \
     # PHP Requirements
