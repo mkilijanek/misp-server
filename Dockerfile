@@ -1,7 +1,7 @@
 # na czas budowania obrazu - źródło plików:
 FROM debian:bullseye-slim as FilesSource
 
-ARG MISP_TAG=2.4.167
+ARG MISP_TAG=2.4.177
 
 RUN apt update && apt install wget -y && mkdir -p /opt/docker-misp && cd /opt/ && wget https://github.com/mkilijanek/misp-server/archive/refs/tags/${MISP_TAG}.tar.gz -cO /opt/${MISP_TAG}.tar.gz && tar xvf /opt/${MISP_TAG}.tar.gz -C /opt && cp -r /opt/misp-server-${MISP_TAG}/* /opt/docker-misp/ 
     
@@ -9,9 +9,9 @@ RUN apt update && apt install wget -y && mkdir -p /opt/docker-misp && cd /opt/ &
 RUN apt-get remove --purge git wget -y && apt-get autoremove -y && apt-get clean -y && rm -rf /var/lib/apt/lists/*
 
 # budowanie obrazu:
-FROM composer:2.2 as composer-build
+FROM composer:lts as composer-build
 
-ARG MISP_TAG=v2.4.167
+ARG MISP_TAG=v2.4.177
 
 RUN set -eux; \
   mkdir -p /var/www/MISP ; \
