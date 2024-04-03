@@ -1,9 +1,10 @@
 # na czas budowania obrazu - źródło plików:
 FROM debian:bullseye-slim as FilesSource
 
-ARG MISP_TAG=2.4.177
+ARG MISP_TAG=2.4.183
 
-RUN apt update && apt install wget -y && mkdir -p /opt/docker-misp && cd /opt/ && wget https://github.com/mkilijanek/misp-server/archive/refs/tags/${MISP_TAG}.tar.gz -cO /opt/${MISP_TAG}.tar.gz && tar xvf /opt/${MISP_TAG}.tar.gz -C /opt && cp -r /opt/misp-server-${MISP_TAG}/* /opt/docker-misp/ 
+RUN apt update && apt install wget -y && mkdir -p /opt/docker-misp 
+RUN cd /opt/ && wget https://github.com/mkilijanek/misp-server/archive/refs/tags/${MISP_TAG}.tar.gz -cO /opt/${MISP_TAG}.tar.gz && tar xvf /opt/${MISP_TAG}.tar.gz -C /opt && cp -r /opt/misp-server-${MISP_TAG}/* /opt/docker-misp/ 
     
     
 RUN apt-get remove --purge git wget -y && apt-get autoremove -y && apt-get clean -y && rm -rf /var/lib/apt/lists/*
@@ -11,7 +12,7 @@ RUN apt-get remove --purge git wget -y && apt-get autoremove -y && apt-get clean
 # budowanie obrazu:
 FROM composer:lts as composer-build
 
-ARG MISP_TAG=v2.4.177
+ARG MISP_TAG=v2.4.183
 
 RUN set -eux; \
   mkdir -p /var/www/MISP ; \
@@ -19,13 +20,13 @@ RUN set -eux; \
   cd /var/www/MISP; \
   git submodule update --init --recursive; \
   mkdir -p /deps; \
-  mv PyMISP /deps; \
+  mv PyMISP /deps/; \
   cd /var/www/MISP/app/files/scripts; \
-  mv mixbox /deps; \
-  mv python-maec /deps; \
-  mv python-cybox /deps; \
-  mv python-stix /deps; \
-  mv cti-python-stix2 /deps
+  mv mixbox /deps/; \
+  mv python-maec /deps/; \
+  mv python-cybox /deps/; \
+  mv python-stix /deps/; \
+  mv cti-python-stix2 /deps/
 
 WORKDIR /var/www/MISP/app
 
@@ -133,14 +134,14 @@ RUN set -eux; \
   pip3 wheel -r requirements.txt --no-cache-dir -w /wheels/
 
 # install PyMISP
-COPY --from=composer-build /deps/PyMISP /tmp/PyMISP/
-RUN set -eux; \
-  cd PyMISP; \
-  python3 setup.py bdist_wheel -d /wheels
+#COPY --from=composer-build /deps/PyMISP /tmp/PyMISP/
+#RUN set -eux; \
+#  cd /tmp/PyMISP; \
+#  python3 setup.py bdist_wheel -d /wheels
 
 # grab other modules we need
 RUN set -eux; \
-  pip3 wheel --no-cache-dir -w /wheels/ plyara pyzmq redis python-magic lief cryptography pydeep
+  pip3 wheel --no-cache-dir -w /wheels/ plyara pyzmq redis python-magic lief cryptography pydeep pymisp
 
 # remove extra packages due to incompatible requirements.txt files
 WORKDIR /wheels
@@ -158,6 +159,7 @@ FROM debian:bullseye-slim
 
 ENV DEBIAN_FRONTEND noninteractive
 
+#PHP 7.4.0
 ARG PHP_VER=20190902
 
 # Use MariaDB mirror repository (more up to date than Debian repositories!):
