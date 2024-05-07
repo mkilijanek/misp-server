@@ -1,7 +1,7 @@
 # na czas budowania obrazu - źródło plików:
 FROM debian:bullseye-slim as FilesSource
 
-ARG MISP_TAG=2.4.188
+ARG MISP_TAG=2.4.192
 
 RUN apt update && apt install wget -y && mkdir -p /opt/docker-misp 
 RUN cd /opt/ && wget https://github.com/mkilijanek/misp-server/archive/refs/tags/${MISP_TAG}.tar.gz -cO /opt/${MISP_TAG}.tar.gz && tar xvf /opt/${MISP_TAG}.tar.gz -C /opt && cp -r /opt/misp-server-${MISP_TAG}/* /opt/docker-misp/ 
@@ -12,7 +12,7 @@ RUN apt-get remove --purge git wget -y && apt-get autoremove -y && apt-get clean
 # budowanie obrazu:
 FROM composer:lts as composer-build
 
-ARG MISP_TAG=v2.4.188
+ARG MISP_TAG=v2.4.192
 
 RUN set -eux; \
   mkdir -p /var/www/MISP ; \
@@ -68,6 +68,7 @@ RUN set -eux; \
   make; \
   make install
 
+# Python modules build:
 FROM debian:bullseye-slim as python-build
 
 ENV DEBIAN_FRONTEND noninteractive
@@ -85,6 +86,7 @@ RUN set -eux; \
     python3-wheel \
     libfuzzy-dev \
     libffi-dev \
+    sendmail \
     ca-certificates; \
   apt-get autoremove -y; \
   apt-get clean -y; \
@@ -155,6 +157,8 @@ RUN set -eux; \
   find . -name "coverage*" | xargs rm -f; \
   find . -name "pytest*" | xargs rm -f
 
+
+# Debian Frontend:
 FROM debian:bullseye-slim
 
 ENV DEBIAN_FRONTEND noninteractive
@@ -175,7 +179,6 @@ RUN set -eux; \
   apt-get update; \
   apt-get upgrade -y; \
   apt-get install -y --no-install-recommends \
-    # requirements
     libfcgi-bin \
     gettext-base \
     procps \
@@ -191,11 +194,9 @@ RUN set -eux; \
     libfuzzy2 \
     mariadb-client \
     rsync \
-    # Python Requirements
     python3 \
     python3-setuptools \
     python3-pip \
-    # PHP Requirements
     php \
     php-curl \
     php-xml \
@@ -212,7 +213,7 @@ RUN set -eux; \
     php-gnupg \
     librdkafka1 \
     libbrotli1 \
-    # Unsure we need these
+    sendmail \
     zip \
     unzip; \
   apt-get autoremove -y; \
