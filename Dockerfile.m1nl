@@ -1,0 +1,5 @@
+FROM m1nl/misp-server:2.4.184
+
+RUN apt update && apt upgrade -y && apt install sendmail
+
+

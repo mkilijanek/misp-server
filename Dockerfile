@@ -86,7 +86,6 @@ RUN set -eux; \
     python3-wheel \
     libfuzzy-dev \
     libffi-dev \
-    sendmail \
     ca-certificates; \
   apt-get autoremove -y; \
   apt-get clean -y; \
@@ -171,7 +170,7 @@ RUN set -eux; \
     apt-get update; \
     apt-get install apt-transport-https curl -y; \
     curl -o /etc/apt/trusted.gpg.d/mariadb_release_signing_key.asc 'https://mariadb.org/mariadb_release_signing_key.asc'; \
-    echo 'deb https://ftp.icm.edu.pl/pub/unix/database/mariadb/repo/10.5/debian bullseye main' >>/etc/apt/sources.list; \
+    echo 'deb https://ftp.icm.edu.pl/pub/unix/database/mariadb/repo/10.11/debian bullseye main' >>/etc/apt/sources.list; \
     apt-get update
     
 # OS packages
@@ -213,7 +212,6 @@ RUN set -eux; \
     php-gnupg \
     librdkafka1 \
     libbrotli1 \
-    sendmail \
     zip \
     unzip; \
   apt-get autoremove -y; \
@@ -279,13 +277,13 @@ RUN ["chmod", "+x", "/usr/local/bin/docker-readiness.sh"]
 COPY --from=FilesSource /opt/docker-misp/files/docker-liveness.sh /usr/local/bin/docker-liveness.sh
 RUN ["chmod", "+x", "/usr/local/bin/docker-liveness.sh"]
 COPY --from=FilesSource /opt/docker-misp/files/php-fpm-healthcheck /usr/local/bin/php-fpm-healthcheck
-RUN ["chmod", "+x", "/usr/local/bin/php-fpm-healthcheck.sh"]
+
 
 # change work directory
 WORKDIR /var/www/MISP
 
 RUN set -eux; \
     apt-get update; \
-    apt-get install apt-transport-https curl -y;
+    apt-get install apt-transport-https curl sendmail -y;
     
-ENTRYPOINT ["/usr/local/bin/docker-entrypoint.sh"]
+ENTRYPOINT ["docker-entrypoint.sh"]
