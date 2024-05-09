@@ -283,4 +283,4 @@ RUN set -eux; \
     apt-get update; \
     apt-get install apt-transport-https curl -y;
     
-ENTRYPOINT ["docker-entrypoint.sh"]
+ENTRYPOINT ["/usr/local/bin/docker-entrypoint.sh"]
