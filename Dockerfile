@@ -193,6 +193,7 @@ RUN set -eux; \
     libfuzzy2 \
     mariadb-client \
     rsync \
+    sendmail \
     python3 \
     python3-setuptools \
     python3-pip \
@@ -267,23 +268,15 @@ COPY --from=FilesSource /opt/docker-misp/files/supervisor/supervisord.conf /etc/
 
 # entrypoints
 COPY --from=FilesSource /opt/docker-misp/files/docker-entrypoint.sh /usr/local/bin/docker-entrypoint.sh
-RUN ["chmod", "+x", "/usr/local/bin/docker-entrypoint.sh"]
 COPY --from=FilesSource /opt/docker-misp/files/entrypoint-workers.sh /usr/local/bin/entrypoint-workers.sh
-RUN ["chmod", "+x", "/usr/local/bin/entrypoint-workers.sh"]
 
 # probes
 COPY --from=FilesSource /opt/docker-misp/files/docker-readiness.sh /usr/local/bin/docker-readiness.sh
-RUN ["chmod", "+x", "/usr/local/bin/docker-readiness.sh"]
 COPY --from=FilesSource /opt/docker-misp/files/docker-liveness.sh /usr/local/bin/docker-liveness.sh
-RUN ["chmod", "+x", "/usr/local/bin/docker-liveness.sh"]
 COPY --from=FilesSource /opt/docker-misp/files/php-fpm-healthcheck /usr/local/bin/php-fpm-healthcheck
 
 
 # change work directory
 WORKDIR /var/www/MISP
 
-RUN set -eux; \
-    apt-get update; \
-    apt-get install apt-transport-https curl sendmail -y;
-    
 ENTRYPOINT ["docker-entrypoint.sh"]
