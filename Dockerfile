@@ -1,5 +1,5 @@
 # na czas budowania obrazu - źródło plików:
-FROM debian:bullseye-slim as FilesSource
+FROM debian:bookworm-20240423-slim as FilesSource
 
 ARG MISP_TAG=2.4.192
 
@@ -35,7 +35,7 @@ RUN set -eux; \
   composer install --ignore-platform-reqs ; \
   composer require jumbojett/openid-connect-php --ignore-platform-reqs
 
-FROM debian:bullseye-slim as php-build
+FROM debian:bookworm-20240423-slim as php-build
 
 ENV DEBIAN_FRONTEND noninteractive
 
@@ -69,7 +69,7 @@ RUN set -eux; \
   make install
 
 # Python modules build:
-FROM debian:bullseye-slim as python-build
+FROM debian:bookworm-20240423-slim as python-build
 
 ENV DEBIAN_FRONTEND noninteractive
 
@@ -158,7 +158,7 @@ RUN set -eux; \
 
 
 # Debian Frontend:
-FROM debian:bullseye-slim
+FROM debian:bookworm-20240423-slim
 
 ENV DEBIAN_FRONTEND noninteractive
 
