@@ -266,13 +266,13 @@ COPY --from=FilesSource /opt/docker-misp/files/php-config-templates /php-config-
 COPY --from=FilesSource /opt/docker-misp/files/supervisor/supervisord.conf /etc/supervisord.conf
 
 # entrypoints
-COPY --from=FilesSource /opt/docker-misp/files/docker-entrypoint.sh /usr/bin/docker-entrypoint.sh
-COPY --from=FilesSource /opt/docker-misp/files/entrypoint-workers.sh /usr/bin/entrypoint-workers.sh
+COPY --from=FilesSource /opt/docker-misp/files/docker-entrypoint.sh /usr/local/bin/docker-entrypoint.sh
+COPY --from=FilesSource /opt/docker-misp/files/entrypoint-workers.sh /usr/local/bin/entrypoint-workers.sh
 
 # probes
-COPY --from=FilesSource /opt/docker-misp/files/docker-readiness.sh /usr/bin/docker-readiness.sh
-COPY --from=FilesSource /opt/docker-misp/files/docker-liveness.sh /usr/bin/docker-liveness.sh
-COPY --from=FilesSource /opt/docker-misp/files/php-fpm-healthcheck /usr/bin/php-fpm-healthcheck
+COPY --from=FilesSource /opt/docker-misp/files/docker-readiness.sh /usr/local/bin/docker-readiness.sh
+COPY --from=FilesSource /opt/docker-misp/files/docker-liveness.sh /usr/local/bin/docker-liveness.sh
+COPY --from=FilesSource /opt/docker-misp/files/php-fpm-healthcheck /usr/local/bin/php-fpm-healthcheck
 
 
 # change work directory
